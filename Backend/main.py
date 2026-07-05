@@ -1,9 +1,32 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+from datetime import datetime
 import requests
 import time
-from datetime import datetime
+
+DATABASE_URL = "sqlite:///./checker.db"
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(bind=engine)
+Base = declarative_base()
+
+# Database model — defines what a check result looks like in the database
+class CheckResult(Base):
+    __tablename__ = "checks"
+    id = Column(Integer, primary_key=True, index=True)
+    url = Column(String)
+    status_code = Column(Integer, nullable=True)
+    is_up = Column(Boolean)
+    response_time_ms = Column(Integer, nullable=True)
+    checked_at = Column(DateTime, default=datetime.now)
+    error = Column(String, nullable=True)
+
+# Create the table if it doesn't exist yet
+Base.metadata.create_all(bind=engine)
+
 
 app = FastAPI()
 
@@ -48,6 +71,21 @@ def check_url(url: str):
             "error": error_message
         }
     
+def save_result(result: dict):
+    db = SessionLocal()
+    try:
+        check = CheckResult(
+            url=result["url"],
+            status_code=result["status_code"],
+            is_up=result["is_up"],
+            response_time_ms=result["response_time_ms"],
+            checked_at=datetime.fromisoformat(result["checked_at"]),
+            error=result["error"]
+        )
+        db.add(check)
+        db.commit()
+    finally:
+        db.close()
 
 @app.get("/")
 def root():
@@ -56,4 +94,24 @@ def root():
 @app.post("/check")
 def check(request: URLRequest):
     result = check_url(request.url)
+    save_result(result)
     return result
+
+@app.get("/history")
+def history():
+    db = SessionLocal()
+    try:
+        checks = db.query(CheckResult).order_by(CheckResult.checked_at.desc()).limit(50).all()
+        return [
+            {
+                "url": c.url,
+                "status_code": c.status_code,
+                "is_up": c.is_up,
+                "response_time_ms": c.response_time_ms,
+                "checked_at": c.checked_at.isoformat(),
+                "error": c.error
+            }
+            for c in checks
+        ]
+    finally:
+        db.close()
