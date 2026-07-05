@@ -29,6 +29,7 @@
 
         <!-- Results section -->
         <div id="results"></div>
+        <div id="history"></div>
     </div>
 
     <script>
@@ -75,6 +76,7 @@
                         ${data.error ? `<p class="text-red-400 text-sm mt-3">Error: ${data.error}</p>` : ''}
                     </div>
                 `;
+                 loadHistory();
             } catch (err) {
                 resultsDiv.innerHTML = '<p class="text-red-400">Failed to connect to backend. Is the server running?</p>';
             }
@@ -83,6 +85,44 @@
         document.getElementById('urlInput').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') checkURL();
         });
+
+async function loadHistory() {
+    try {
+        const response = await fetch('http://127.0.0.1:8000/history');
+        const data = await response.json();
+
+        if (data.length === 0) return;
+
+        let historyHTML = '<h2 class="text-xl font-semibold mb-4 mt-10">Recent Checks</h2>';
+        historyHTML += '<div class="flex flex-col gap-3">';
+
+        data.forEach(item => {
+            const statusColor = item.is_up ? 'text-green-400' : 'text-red-400';
+            const statusText = item.is_up ? 'UP' : 'DOWN';
+            const statusBg = item.is_up ? 'border-green-800 bg-green-950' : 'border-red-800 bg-red-950';
+            const time = new Date(item.checked_at).toLocaleTimeString();
+
+            historyHTML += `
+                <div class="border ${statusBg} rounded-lg p-4 flex justify-between items-center">
+                    <span class="font-mono text-sm text-gray-300">${item.url}</span>
+                    <div class="flex gap-6 text-sm">
+                        <span class="text-gray-400">${item.response_time_ms ?? 'N/A'}ms</span>
+                        <span class="text-gray-400">${time}</span>
+                        <span class="font-bold ${statusColor}">${statusText}</span>
+                    </div>
+                </div>
+            `;
+        });
+
+        historyHTML += '</div>';
+        document.getElementById('history').innerHTML = historyHTML;
+    } catch (err) {
+        console.log('Could not load history');
+    }
+}
+
+loadHistory();
+
     </script>
 
 </body>
