@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL Checker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-950 text-white min-h-screen p-8">
+
+    <div class="max-w-3xl mx-auto">
+        <h1 class="text-3xl font-bold mb-2">URL Status Checker</h1>
+        <p class="text-gray-400 mb-8">Check if a website is up and how fast it responds</p>
+
+        <!-- Input section -->
+        <div class="flex gap-3 mb-8">
+            <input 
+                id="urlInput"
+                type="text" 
+                placeholder="https://www.example.com"
+                class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+            />
+            <button 
+                onclick="checkURL()"
+                class="bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-lg font-medium transition-colors">
+                Check
+            </button>
+        </div>
+
+        <!-- Results section -->
+        <div id="results"></div>
+    </div>
+
+    <script>
+        async function checkURL() {
+            const url = document.getElementById('urlInput').value.trim();
+            if (!url) return;
+
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<p class="text-gray-400">Checking...</p>';
+
+            try {
+                const response = await fetch('http://127.0.0.1:8000/check', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url })
+                });
+
+                const data = await response.json();
+
+                const statusColor = data.is_up ? 'text-green-400' : 'text-red-400';
+                const statusText = data.is_up ? 'UP' : 'DOWN';
+                const statusBg = data.is_up ? 'border-green-800 bg-green-950' : 'border-red-800 bg-red-950';
+
+                resultsDiv.innerHTML = `
+                    <div class="border ${statusBg} rounded-lg p-5">
+                        <div class="flex justify-between items-center mb-3">
+                            <span class="font-mono text-sm text-gray-300">${data.url}</span>
+                            <span class="font-bold text-lg ${statusColor}">${statusText}</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-4 text-sm">
+                            <div>
+                                <p class="text-gray-500 mb-1">Status Code</p>
+                                <p class="font-medium">${data.status_code ?? 'N/A'}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-500 mb-1">Response Time</p>
+                                <p class="font-medium">${data.response_time_ms ?? 'N/A'}ms</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-500 mb-1">Checked At</p>
+                                <p class="font-medium">${new Date(data.checked_at).toLocaleTimeString()}</p>
+                            </div>
+                        </div>
+                        ${data.error ? `<p class="text-red-400 text-sm mt-3">Error: ${data.error}</p>` : ''}
+                    </div>
+                `;
+            } catch (err) {
+                resultsDiv.innerHTML = '<p class="text-red-400">Failed to connect to backend. Is the server running?</p>';
+            }
+        }
+
+        document.getElementById('urlInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') checkURL();
+        });
+    </script>
+
+</body>
+</html>
